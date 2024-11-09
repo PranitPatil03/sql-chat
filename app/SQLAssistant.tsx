@@ -134,7 +134,7 @@ const LoadingDots = () => {
         if (prev === "..") return "...";
         return "";
       });
-    }, 500); // Change dots every 500ms
+    }, 500);
 
     return () => clearInterval(interval);
   }, []);
@@ -182,30 +182,19 @@ export default function SQLAssistant() {
     if (!input.trim()) return;
 
     const userMessage: Message = { type: "user", content: input };
-    updateChat(currentChatId, [...currentChat.messages, userMessage]);
+    const userInput = input;
     setInput("");
     setIsLoading(true);
-    setCurrentStep(null);
+    setCurrentStep(steps[0]);
     setCompletedSteps(0);
 
+    updateChat(currentChatId, [...currentChat.messages, userMessage]);
+
     try {
-      for (let i = 0; i < steps.length; i++) {
-        setCurrentStep(steps[i]);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        setCompletedSteps(i + 1);
-      }
-
-      setCurrentStep({
-        step: "Finalizing",
-        detail: "Preparing the final response",
-        icon: Loader2,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: input }),
+        body: JSON.stringify({ question: userInput }),
       });
 
       if (!response.ok) {
@@ -213,6 +202,12 @@ export default function SQLAssistant() {
       }
 
       const data: ServerResponse = await response.json();
+
+      for (let i = 0; i < steps.length; i++) {
+        setCurrentStep(steps[i]);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        setCompletedSteps(i + 1);
+      }
 
       const assistantMessage: Message = {
         type: "assistant",
@@ -225,14 +220,11 @@ export default function SQLAssistant() {
       ]);
     } catch (error) {
       console.error("Error fetching response:", error);
-      updateChat(currentChatId, [
-        ...currentChat.messages,
-        userMessage,
-        {
-          type: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
-        },
-      ]);
+      const errorMessage: Message = {
+        type: "assistant",
+        content: "Sorry, I encountered an error. Please try again.",
+      };
+      updateChat(currentChatId, [...currentChat.messages, errorMessage]);
     } finally {
       setIsLoading(false);
       setCurrentStep(null);
